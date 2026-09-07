@@ -341,8 +341,10 @@ canvas {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 18px 2px 0;
   border-top: 1px solid var(--separator);
+  scrollbar-gutter: stable;
 }
 
 .translation-text {
@@ -480,6 +482,14 @@ canvas {
   .reader { grid-template-columns: 1fr; }
   .canvas-stage { min-height: min(62vh, 680px); }
   .translation-pane { min-height: 400px; }
+}
+
+@media (min-width: 921px) and (min-height: 640px) {
+  html, body, #root { height: 100%; overflow: hidden; }
+  .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+  .reader { min-height: 0; overflow: hidden; }
+  .canvas-stage { min-height: 0; }
+  .translation-pane { min-height: 0; }
 }
 
 @media (max-width: 640px) {

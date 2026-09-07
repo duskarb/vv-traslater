@@ -69,6 +69,7 @@ function App() {
   const fileInputRef = useRef(null);
   const renderTaskRef = useRef(null);
   const latestRequestRef = useRef(0);
+  const translationRequestRef = useRef(null);
   const [fileName, setFileName] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [pdf, setPdf] = useState(null);
@@ -127,7 +128,12 @@ function App() {
 
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      setStageSize({ width, height });
+      const nextSize = { width: Math.round(width), height: Math.round(height) };
+      setStageSize((currentSize) => (
+        currentSize.width === nextSize.width && currentSize.height === nextSize.height
+          ? currentSize
+          : nextSize
+      ));
     });
 
     observer.observe(stageRef.current);
@@ -173,6 +179,7 @@ function App() {
     async ({ force = false } = {}) => {
       if (!canvasRef.current || !documentId || !pageNumber) return;
 
+      const requestKey = cacheKey(documentId, pageNumber);
       const cached = !force ? readCachedTranslation(documentId, pageNumber) : null;
       if (cached) {
         setTranslation(cached);
@@ -182,8 +189,12 @@ function App() {
         return;
       }
 
+      if (!force && translationRequestRef.current?.key === requestKey) return;
+
       const requestId = latestRequestRef.current + 1;
+      const requestToken = Symbol(requestKey);
       latestRequestRef.current = requestId;
+      translationRequestRef.current = { key: requestKey, token: requestToken };
       setTranslationStatus('loading');
       setTranslationError('');
       setIsCached(false);
@@ -209,10 +220,25 @@ function App() {
         if (latestRequestRef.current !== requestId) return;
         setTranslationError(error?.message || '번역 중 문제가 생겼습니다.');
         setTranslationStatus('error');
+      } finally {
+        if (translationRequestRef.current?.token === requestToken) {
+          translationRequestRef.current = null;
+        }
       }
     },
     [documentId, pageNumber],
   );
+
+  useEffect(() => {
+    if (!documentId || !pageNumber) return;
+
+    latestRequestRef.current += 1;
+    translationRequestRef.current = null;
+    setTranslationStatus('idle');
+    setTranslationError('');
+    setTranslation('');
+    setIsCached(false);
+  }, [documentId, pageNumber]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,10 +251,6 @@ function App() {
       }
 
       setViewerStatus('페이지를 그리는 중입니다.');
-      setTranslationStatus('idle');
-      setTranslationError('');
-      setTranslation('');
-      setIsCached(false);
 
       try {
         const page = await pdf.getPage(pageNumber);
