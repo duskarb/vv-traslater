@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">VV PDF Translator</title>
+  <defs>
+    <linearGradient id="background" x1="74" y1="54" x2="446" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#183A5E"/>
+      <stop offset="1" stop-color="#071A33"/>
+    </linearGradient>
+    <linearGradient id="page" x1="140" y1="104" x2="374" y2="405" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1F8FF"/>
+      <stop offset="1" stop-color="#BBDFFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#background)"/>
+  <path d="M139 112c0-20 16-36 36-36h137l73 73v200c0 20-16 36-36 36H175c-20 0-36-16-36-36V112Z" fill="#6FB9FF" fill-opacity=".25"/>
+  <path d="M120 142c0-20 16-36 36-36h137l73 73v194c0 20-16 36-36 36H156c-20 0-36-16-36-36V142Z" fill="url(#page)"/>
+  <path d="M293 106v55c0 10 8 18 18 18h55" fill="none" stroke="#75BEFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="18"/>
+  <path d="M178 237h96M178 283h132M178 329h94" fill="none" stroke="#1369B8" stroke-linecap="round" stroke-width="20"/>
+  <circle cx="339" cy="309" r="58" fill="#0A84FF"/>
+  <path d="M339 273v72M303 309h72" fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="18"/>
+</svg>

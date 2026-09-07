@@ -84,12 +84,14 @@ function App() {
   const [translationStatus, setTranslationStatus] = useState('idle');
   const [translationError, setTranslationError] = useState('');
   const [isCached, setIsCached] = useState(false);
-  const [hoverSide, setHoverSide] = useState(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [aiConsent, setAiConsent] = useState(false);
+  const [consentError, setConsentError] = useState('');
 
   const canNavigate = Boolean(pdf && totalPages);
+  const hasDocument = Boolean(pdf);
   const currentMeta = useMemo(() => {
-    if (!fileName) return 'PDF를 불러오면 페이지별 번역을 시작합니다.';
+    if (!fileName) return '';
     return `${fileName} · ${totalPages || '-'} pages`;
   }, [fileName, totalPages]);
   const scale = useMemo(() => clamp(fitScale + zoomOffset, MIN_SCALE, MAX_SCALE), [fitScale, zoomOffset]);
@@ -132,6 +134,40 @@ function App() {
 
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!canNavigate) return undefined;
+
+    function handleKeyDown(event) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName)) return;
+
+      const isRightToLeft = document.documentElement.dir === 'rtl';
+      const previousKey = isRightToLeft ? 'ArrowRight' : 'ArrowLeft';
+      const nextKey = isRightToLeft ? 'ArrowLeft' : 'ArrowRight';
+
+      if (event.key === previousKey && pageNumber > 1) {
+        event.preventDefault();
+        setPageNumber((current) => {
+          const next = current - 1;
+          setPageInput(String(next));
+          return next;
+        });
+      }
+
+      if (event.key === nextKey && pageNumber < totalPages) {
+        event.preventDefault();
+        setPageNumber((current) => {
+          const next = current + 1;
+          setPageInput(String(next));
+          return next;
+        });
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canNavigate, pageNumber, totalPages]);
 
   const translateCurrentCanvas = useCallback(
     async ({ force = false } = {}) => {
@@ -249,6 +285,11 @@ function App() {
   async function loadLocalFile(file) {
     if (!file) return;
 
+    if (!aiConsent) {
+      setConsentError('PDF를 열기 전에 번역 전송 동의를 확인해 주세요.');
+      return;
+    }
+
     const looksLikePdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     if (!looksLikePdf) {
       setViewerStatus('PDF 파일만 열 수 있습니다.');
@@ -274,6 +315,10 @@ function App() {
   }
 
   function openFilePicker() {
+    if (!aiConsent) {
+      setConsentError('PDF를 열기 전에 번역 전송 동의를 확인해 주세요.');
+      return;
+    }
     fileInputRef.current?.click();
   }
 
@@ -306,26 +351,6 @@ function App() {
     setZoomOffset(0);
   }
 
-  function handleStageMouseMove(event) {
-    if (!canNavigate || isDraggingFile) {
-      setHoverSide(null);
-      return;
-    }
-
-    const stageRect = event.currentTarget.getBoundingClientRect();
-    setHoverSide(event.clientX < stageRect.left + stageRect.width / 2 ? 'left' : 'right');
-  }
-
-  function handleStageClick() {
-    if (isDraggingFile) return;
-    if (hoverSide === 'left' && pageNumber > 1) {
-      movePage(-1);
-    }
-    if (hoverSide === 'right' && pageNumber < totalPages) {
-      movePage(1);
-    }
-  }
-
   function handleStageDragOver(event) {
     event.preventDefault();
     setIsDraggingFile(true);
@@ -345,14 +370,23 @@ function App() {
 
   function renderTranslationBody() {
     if (translationStatus === 'loading') {
-      return <div className="translation-empty">이 페이지의 문자를 읽고 번역하는 중입니다.</div>;
+      return (
+        <div className="translation-empty" role="status">
+          <span className="loading-indicator" aria-hidden="true" />
+          <strong>번역을 준비하고 있습니다</strong>
+          <span>이 페이지의 문자를 읽고 한국어로 옮기는 중입니다.</span>
+        </div>
+      );
     }
 
     if (translationStatus === 'error') {
       return (
-        <div className="translation-error">
+        <div className="translation-error" role="alert">
           <strong>번역을 완료하지 못했습니다.</strong>
           <span>{translationError}</span>
+          <button className="inline-action" type="button" onClick={() => translateCurrentCanvas({ force: true })}>
+            다시 시도
+          </button>
         </div>
       );
     }
@@ -365,7 +399,7 @@ function App() {
       );
     }
 
-    return <div className="translation-empty">페이지가 렌더링되면 자동으로 번역합니다.</div>;
+    return <div className="translation-empty">번역 결과가 여기에 표시됩니다.</div>;
   }
 
   return (
@@ -373,17 +407,18 @@ function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">VV PDF Translator</p>
-          <h1>페이지를 넘길 때마다 한국어로 읽기</h1>
+          <h1>PDF를 한국어로 읽어보세요</h1>
         </div>
         <div className="file-control">
-          <button type="button" onClick={openFilePicker}>
-            컴퓨터에서 PDF 열기
+          <button className="primary-button" type="button" onClick={openFilePicker} disabled={!aiConsent}>
+            PDF 열기
           </button>
           <input
             ref={fileInputRef}
             className="file-input"
             type="file"
             accept="application/pdf"
+            disabled={!aiConsent}
             onChange={handleFileChange}
           />
         </div>
@@ -391,13 +426,23 @@ function App() {
 
       <section className="reader">
         <section className="pdf-pane" aria-label="PDF 원문">
-          <div className="toolbar">
-            <button type="button" onClick={() => movePage(-1)} disabled={!canNavigate || pageNumber <= 1}>
+          <div className="toolbar glass-toolbar">
+            <button
+              type="button"
+              aria-label="이전 페이지"
+              aria-keyshortcuts="ArrowLeft"
+              onClick={() => movePage(-1)}
+              disabled={!canNavigate || pageNumber <= 1}
+            >
               이전
             </button>
             <form className="page-form" onSubmit={submitPage}>
               <input
                 aria-label="페이지 번호"
+                type="number"
+                min="1"
+                max={totalPages || undefined}
+                step="1"
                 inputMode="numeric"
                 value={pageInput}
                 onChange={(event) => setPageInput(event.target.value)}
@@ -405,11 +450,7 @@ function App() {
               />
               <span>/ {totalPages || '-'}</span>
             </form>
-            <button
-              type="button"
-              onClick={() => movePage(1)}
-              disabled={!canNavigate || pageNumber >= totalPages}
-            >
+            <button type="button" aria-label="다음 페이지" aria-keyshortcuts="ArrowRight" onClick={() => movePage(1)} disabled={!canNavigate || pageNumber >= totalPages}>
               다음
             </button>
             <div className="toolbar-spacer" />
@@ -427,37 +468,80 @@ function App() {
             </button>
           </div>
 
-          <div className="pdf-meta">{currentMeta}</div>
+          {hasDocument ? <div className="pdf-meta" aria-live="polite">{currentMeta}</div> : null}
           <div
             ref={stageRef}
             className={[
               'canvas-stage',
-              hoverSide ? `is-hovering-${hoverSide}` : '',
-              pageNumber > 1 ? 'can-go-left' : '',
-              pageNumber < totalPages ? 'can-go-right' : '',
+              hasDocument ? 'has-document' : '',
               isDraggingFile ? 'is-dragging-file' : '',
             ].join(' ')}
-            onMouseMove={handleStageMouseMove}
-            onMouseLeave={() => setHoverSide(null)}
-            onClick={handleStageClick}
             onDragOver={handleStageDragOver}
             onDragLeave={handleStageDragLeave}
             onDrop={handleStageDrop}
-            role="presentation"
+            aria-busy={Boolean(viewerStatus)}
           >
-            {isDraggingFile ? (
+            {!hasDocument ? (
+              <div className="empty-state">
+                <div className="document-mark" aria-hidden="true">
+                  <svg viewBox="0 0 40 48" fill="none">
+                    <path d="M8 2.5h16l8 8V43a2.5 2.5 0 0 1-2.5 2.5h-21A2.5 2.5 0 0 1 6 43V5a2.5 2.5 0 0 1 2-2.5Z" />
+                    <path d="M24 2.5V11h8M12 21h14M12 28h14M12 35h9" />
+                  </svg>
+                </div>
+                <h2>PDF를 선택하세요</h2>
+                <p>파일을 이곳에 놓거나 선택하세요.</p>
+                <label className="consent-control">
+                  <input
+                    type="checkbox"
+                    checked={aiConsent}
+                    onChange={(event) => {
+                      setAiConsent(event.target.checked);
+                      setConsentError('');
+                    }}
+                  />
+                  <span>현재 페이지 이미지를 Gemini에 보내 번역하는 데 동의합니다.</span>
+                </label>
+                {consentError ? <p className="inline-error" role="alert">{consentError}</p> : null}
+                <button className="primary-button" type="button" onClick={openFilePicker} disabled={!aiConsent}>PDF 선택</button>
+              </div>
+            ) : isDraggingFile ? (
               <div className="viewer-status">PDF를 놓으면 이 파일로 열립니다.</div>
             ) : viewerStatus ? (
-              <div className="viewer-status">{viewerStatus}</div>
+              <div className="viewer-status" role="status">{viewerStatus}</div>
             ) : null}
-            <canvas ref={canvasRef} />
+            {hasDocument ? (
+              <>
+                <canvas ref={canvasRef} role="img" aria-label={`${fileName} ${pageNumber}페이지 원문`} />
+                <div className="stage-navigation" aria-label="페이지 이동">
+                  <button
+                    className="stage-nav-button"
+                    type="button"
+                    aria-keyshortcuts="ArrowLeft"
+                    onClick={() => movePage(-1)}
+                    disabled={pageNumber <= 1}
+                  >
+                    이전 페이지
+                  </button>
+                  <button
+                    className="stage-nav-button"
+                    type="button"
+                    aria-keyshortcuts="ArrowRight"
+                    onClick={() => movePage(1)}
+                    disabled={pageNumber >= totalPages}
+                  >
+                    다음 페이지
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
         </section>
 
-        <aside className="translation-pane" aria-label="한국어 번역">
+        <aside className="translation-pane" aria-label="한국어 번역" aria-busy={translationStatus === 'loading'}>
           <div className="translation-header">
             <div>
-              <p className="eyebrow">Korean Translation</p>
+              <p className="eyebrow">AI Korean Translation</p>
               <h2>{canNavigate ? `${pageNumber}페이지` : '대기 중'}</h2>
             </div>
             <button
@@ -469,22 +553,25 @@ function App() {
             </button>
           </div>
 
-          <div className="status-row">
-            <span className={`status-dot ${translationStatus}`} />
-            <span>
-              {translationStatus === 'loading'
-                ? '번역 중'
-                : translationStatus === 'error'
-                  ? '확인 필요'
-                  : translation
-                    ? isCached
-                      ? '캐시됨'
-                      : '번역 완료'
-                    : '준비됨'}
-            </span>
-          </div>
+          {canNavigate ? (
+            <div className="status-row" role="status" aria-live="polite">
+              <span className={`status-dot ${translationStatus}`} aria-hidden="true" />
+              <span>
+                {translationStatus === 'loading'
+                  ? '번역 중'
+                  : translationStatus === 'error'
+                    ? '확인 필요'
+                    : translation
+                      ? isCached
+                        ? '캐시됨'
+                        : '번역 완료'
+                      : '준비됨'}
+              </span>
+            </div>
+          ) : null}
 
-          <div className="translation-card">{renderTranslationBody()}</div>
+          <div className="translation-card" dir="auto">{renderTranslationBody()}</div>
+          {canNavigate ? <p className="ai-note">AI 번역은 초안일 수 있습니다. 중요한 내용은 원문과 함께 확인하세요.</p> : null}
         </aside>
       </section>
     </main>

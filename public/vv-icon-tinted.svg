@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">VV PDF Translator</title>
+  <path d="M139 112c0-20 16-36 36-36h137l73 73v200c0 20-16 36-36 36H175c-20 0-36-16-36-36V112Z" fill="currentColor" fill-opacity=".38"/>
+  <path d="M120 142c0-20 16-36 36-36h137l73 73v194c0 20-16 36-36 36H156c-20 0-36-16-36-36V142Z" fill="currentColor"/>
+  <path d="M293 106v55c0 10 8 18 18 18h55M178 237h96M178 283h132M178 329h94" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="20"/>
+  <circle cx="339" cy="309" r="58" fill="#fff"/>
+  <path d="M339 273v72M303 309h72" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="18"/>
+</svg>
