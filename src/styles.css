@@ -15,6 +15,8 @@
   --shadow: 0 18px 44px rgba(28, 28, 30, 0.1);
   --glass-regular: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.56));
   --glass-clear: rgba(255, 255, 255, 0.56);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -30,10 +32,10 @@ body {
   background: var(--canvas);
 }
 
-button, input, select { font: inherit; }
-button, select, input { min-height: 36px; }
+.app-shell button, .app-shell input, .app-shell select { font: inherit; }
+.app-shell button, .app-shell select, .app-shell input { min-height: 36px; }
 
-button {
+.app-shell button {
   appearance: none;
   border: 1px solid var(--separator);
   border-radius: 9px;
@@ -45,18 +47,20 @@ button {
   line-height: 1.2;
   cursor: pointer;
   touch-action: manipulation;
-  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition: background-color 140ms var(--ease-out), border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-button:hover:not(:disabled) {
-  border-color: rgba(0, 122, 255, 0.42);
-  background: color-mix(in srgb, var(--accent) 7%, var(--surface-solid));
+@media (hover: hover) and (pointer: fine) {
+  .app-shell button:hover:not(:disabled) {
+    border-color: rgba(0, 122, 255, 0.42);
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface-solid));
+  }
 }
 
-button:active:not(:disabled) { transform: scale(0.98); }
-button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: 0.42; }
+.app-shell button:active:not(:disabled) { transform: scale(0.97); }
+.app-shell button:disabled, .app-shell input:disabled, .app-shell select:disabled { cursor: not-allowed; opacity: 0.42; }
 
-button:focus-visible, input:focus-visible, select:focus-visible {
+.app-shell button:focus-visible, .app-shell input:focus-visible, .app-shell select:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
   outline-offset: 2px;
 }
@@ -69,7 +73,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   box-shadow: 0 1px 2px rgba(0, 92, 184, 0.25);
 }
 
-.primary-button:hover:not(:disabled) { border-color: var(--accent-hover); background: var(--accent-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .primary-button:hover:not(:disabled) { border-color: var(--accent-hover); background: var(--accent-hover); }
+}
 
 .app-shell {
   display: flex;
@@ -302,10 +308,10 @@ canvas {
   backdrop-filter: blur(16px) saturate(135%);
   opacity: 0;
   pointer-events: auto;
-  transition: opacity 160ms ease, background-color 140ms ease, transform 140ms ease;
+  transition: opacity 160ms var(--ease-out), background-color 140ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.canvas-stage:hover .stage-nav-button, .stage-nav-button:focus-visible { opacity: 1; }
+.stage-nav-button:focus-visible { opacity: 1; }
 .stage-nav-button:disabled { visibility: hidden; }
 
 .translation-pane {
@@ -322,6 +328,7 @@ canvas {
 
 .translation-header, .status-row { display: flex; align-items: center; gap: 8px; }
 .translation-header { justify-content: space-between; }
+.translation-actions { display: flex; flex: 0 0 auto; gap: 8px; }
 
 .status-row { color: var(--secondary-text); font-size: 14px; }
 
@@ -333,7 +340,7 @@ canvas {
   background: var(--tertiary-text);
 }
 
-.status-dot.loading { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.status-dot.loading { background: var(--accent); }
 .status-dot.done { background: #248a3d; }
 .status-dot.error { background: var(--error); }
 
@@ -354,6 +361,19 @@ canvas {
   overflow-wrap: anywhere;
   text-align: start;
   unicode-bidi: plaintext;
+}
+
+.translation-reveal {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+@starting-style {
+  .translation-reveal {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .translation-text > :first-child { margin-top: 0; }
@@ -435,14 +455,12 @@ canvas {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes pulse { 50% { opacity: 0.35; } }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+  .app-shell button, .stage-nav-button { transition-property: background-color, border-color, box-shadow; }
+  .app-shell button:active:not(:disabled), .translation-reveal { transform: none; }
+  .translation-reveal { transition: opacity 160ms linear; }
+  .loading-indicator { animation: none; }
 }
 
 @media (prefers-contrast: more) {
@@ -451,6 +469,14 @@ canvas {
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .toolbar, .stage-nav-button { background: var(--surface-solid); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .toolbar, .stage-nav-button {
+    background: var(--surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -509,4 +535,12 @@ canvas {
   .toolbar button, .toolbar select, .page-form { font-size: 13px; }
   .canvas-stage, .canvas-stage.has-document { min-height: 420px; }
   .empty-state { padding: 24px 18px; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .canvas-stage:hover .stage-nav-button { opacity: 1; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .stage-nav-button { opacity: 1; }
 }

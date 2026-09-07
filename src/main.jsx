@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as pdfjsLib from 'pdfjs-dist';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Toaster, toast } from 'sonner';
 import './styles.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -218,8 +219,13 @@ function App() {
         setTranslationStatus('done');
       } catch (error) {
         if (latestRequestRef.current !== requestId) return;
-        setTranslationError(error?.message || '번역 중 문제가 생겼습니다.');
+        const message = error?.message || '번역 중 문제가 생겼습니다.';
+        setTranslationError(message);
         setTranslationStatus('error');
+        toast.error('번역을 완료하지 못했습니다.', {
+          id: `translation-error:${requestKey}`,
+          description: message,
+        });
       } finally {
         if (translationRequestRef.current?.token === requestToken) {
           translationRequestRef.current = null;
@@ -373,6 +379,20 @@ function App() {
     setZoomOffset(0);
   }
 
+  async function copyTranslation() {
+    if (!translation) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('이 브라우저에서는 클립보드를 사용할 수 없습니다.');
+      }
+      await navigator.clipboard.writeText(translation);
+      toast.success('번역문을 복사했습니다.');
+    } catch {
+      toast.error('번역문을 복사하지 못했습니다.');
+    }
+  }
+
   function handleStageDragOver(event) {
     event.preventDefault();
     setIsDraggingFile(true);
@@ -415,7 +435,7 @@ function App() {
 
     if (translation) {
       return (
-        <div className="translation-text">
+        <div className="translation-text translation-reveal">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{translation}</ReactMarkdown>
         </div>
       );
@@ -425,7 +445,8 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <>
+      <main className="app-shell">
       <header className="topbar">
         <div>
           <p className="eyebrow">VV PDF Translator</p>
@@ -566,13 +587,18 @@ function App() {
               <p className="eyebrow">AI Korean Translation</p>
               <h2>{canNavigate ? `${pageNumber}페이지` : '대기 중'}</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => translateCurrentCanvas({ force: true })}
-              disabled={!canNavigate || translationStatus === 'loading'}
-            >
-              재번역
-            </button>
+            <div className="translation-actions">
+              <button type="button" onClick={copyTranslation} disabled={!translation}>
+                복사
+              </button>
+              <button
+                type="button"
+                onClick={() => translateCurrentCanvas({ force: true })}
+                disabled={!canNavigate || translationStatus === 'loading'}
+              >
+                재번역
+              </button>
+            </div>
           </div>
 
           {canNavigate ? (
@@ -596,7 +622,9 @@ function App() {
           {canNavigate ? <p className="ai-note">AI 번역은 초안일 수 있습니다. 중요한 내용은 원문과 함께 확인하세요.</p> : null}
         </aside>
       </section>
-    </main>
+      </main>
+      <Toaster position="bottom-center" theme="system" richColors />
+    </>
   );
 }
 
