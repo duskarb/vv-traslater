@@ -22,6 +22,10 @@
   --glass-clear: rgba(255, 255, 255, 0.72);
   /* Bright top edge: light catching the lip of the material. */
   --glass-edge: rgba(255, 255, 255, 0.5);
+  /* The floating page controls and the space the page leaves for them are one
+     number, so they cannot drift apart and overlap again. */
+  --stage-control: 2.25rem;
+  --stage-gutter: calc(var(--stage-control) + 24px);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
@@ -43,10 +47,25 @@ body {
   background: var(--canvas);
 }
 
-.app-shell button, .app-shell input, .app-shell select { font: inherit; }
-.app-shell button, .app-shell select, .app-shell input { min-height: 2.25rem; }
+/* When a control gets a box, and when it gets a label — two separate calls.
+   Box: belongs to the chrome that groups controls, not to every control inside
+   it, plus anything floating over busy content where the target would
+   otherwise be invisible. Toolbar buttons are already grouped by the toolbar,
+   so they carry no border of their own; the page controls float over the PDF,
+   so they keep a circular one.
+   Label: for actions with no conventional symbol (복사, 재번역, PDF 열기).
+   Direction and zoom have universal glyphs and read from their position, so a
+   word is redundant weight — every icon-only control keeps aria-label and
+   title, so nothing is lost to a screen reader or on hover. */
 
-.app-shell button {
+/* :where() keeps these at element specificity, so a variant class such as
+   .primary-button or .stage-nav-button overrides them instead of losing to
+   them. Without it, `.app-shell button` (0,1,1) silently beats every (0,1,0)
+   variant. */
+:where(.app-shell) button, :where(.app-shell) input, :where(.app-shell) select { font: inherit; }
+:where(.app-shell) button, :where(.app-shell) select, :where(.app-shell) input { min-height: 2.25rem; }
+
+:where(.app-shell) button {
   appearance: none;
   border: 1px solid var(--separator);
   border-radius: 9px;
@@ -62,19 +81,38 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .app-shell button:hover:not(:disabled) {
+  :where(.app-shell) button:hover:not(:disabled) {
     border-color: rgba(0, 122, 255, 0.42);
     background: color-mix(in srgb, var(--accent) 7%, var(--surface-solid));
   }
 }
 
-.app-shell button:active:not(:disabled) { transform: scale(0.97); }
+:where(.app-shell) button:active:not(:disabled) { transform: scale(0.97); }
 .app-shell button:disabled, .app-shell input:disabled, .app-shell select:disabled { cursor: not-allowed; opacity: 0.42; }
 
 .app-shell button:focus-visible, .app-shell input:focus-visible, .app-shell select:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
   outline-offset: 2px;
 }
+
+.icon-button {
+  display: inline-grid;
+  width: var(--stage-control);
+  padding: 0;
+  place-items: center;
+}
+
+.glyph {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[dir='rtl'] .glyph-directional { transform: scaleX(-1); }
 
 .primary-button {
   min-height: 2.5rem;
@@ -133,7 +171,7 @@ h2 { font-size: 1.3125rem; font-weight: 700; line-height: 1.25; letter-spacing: 
 }
 
 .pdf-pane, .translation-pane { min-width: 0; min-height: 0; }
-.pdf-pane { display: flex; flex-direction: column; }
+.pdf-pane { display: flex; flex-direction: column; gap: 12px; }
 
 .toolbar {
   border: 1px solid var(--separator);
@@ -166,6 +204,20 @@ h2 { font-size: 1.3125rem; font-weight: 700; line-height: 1.25; letter-spacing: 
   background: var(--surface-solid);
 }
 
+/* The toolbar is the container; its buttons are not each a container. */
+.toolbar button {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toolbar button:hover:not(:disabled) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+  }
+}
+
 .toolbar select { padding: 0 8px; }
 .toolbar-spacer { flex: 1; min-width: 8px; }
 
@@ -193,7 +245,7 @@ h2 { font-size: 1.3125rem; font-weight: 700; line-height: 1.25; letter-spacing: 
 }
 
 .pdf-meta {
-  padding: 11px 3px;
+  padding: 0 3px;
   overflow: hidden;
   color: var(--secondary-text);
   font-size: 0.875rem;
@@ -215,7 +267,7 @@ h2 { font-size: 1.3125rem; font-weight: 700; line-height: 1.25; letter-spacing: 
   transition: background-color 140ms var(--ease-out), border-color 140ms var(--ease-out);
 }
 
-.canvas-stage.has-document { padding: 24px 70px; }
+.canvas-stage.has-document { padding: 24px var(--stage-gutter); }
 
 /* Drop feedback is an outline, not a thicker border — the page underneath must not shift. */
 .canvas-stage.is-dragging-file {
@@ -321,7 +373,7 @@ canvas {
 .stage-navigation {
   position: absolute;
   inset-block: 0;
-  inset-inline: 14px;
+  inset-inline: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -331,7 +383,14 @@ canvas {
 /* These float over the page itself, so the material carries a heavier shadow
    to stay separated from the text underneath. */
 .stage-nav-button {
-  min-width: 88px;
+  display: grid;
+  width: var(--stage-control);
+  min-width: 0;
+  height: var(--stage-control);
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  place-items: center;
   color: var(--text);
   background: var(--glass-clear);
   box-shadow: var(--shadow-2);
@@ -581,6 +640,7 @@ canvas {
   html, body, #root { height: 100%; overflow: hidden; }
   .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
   .reader { min-height: 0; overflow: hidden; }
+  .glass-toolbar { position: static; }
   .canvas-stage { min-height: 0; }
   .translation-pane { min-height: 0; }
 }
@@ -592,7 +652,8 @@ canvas {
   .toolbar { flex-wrap: wrap; overflow: visible; }
   .glass-toolbar { top: 8px; }
   .toolbar-spacer { flex-basis: 100%; height: 0; }
-  .canvas-stage, .canvas-stage.has-document { min-height: 480px; padding: 20px; }
+  .canvas-stage { min-height: 480px; padding: 20px; }
+  .canvas-stage.has-document { min-height: 480px; padding: 20px 20px calc(var(--stage-control) + 28px); }
   .stage-navigation { inset-block: auto 10px; inset-inline: 10px; }
   .stage-nav-button { opacity: 1; }
   .translation-pane { padding: 18px; }
