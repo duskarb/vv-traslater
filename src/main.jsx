@@ -64,6 +64,30 @@ function buildTranslationImageDataUrl(sourceCanvas) {
   return canvas.toDataURL('image/jpeg', 0.82);
 }
 
+// Icon-only controls are limited to actions with a conventional glyph, where
+// the symbol plus its position says more than a word would. Everything else
+// keeps its label.
+const GLYPH_PATHS = {
+  previous: 'M12.5 4.5 7 10l5.5 5.5',
+  next: 'M7.5 4.5 13 10l-5.5 5.5',
+  minus: 'M4.75 10h10.5',
+  plus: 'M10 4.75v10.5M4.75 10h10.5',
+};
+
+function Glyph({ name }) {
+  const isDirectional = name === 'previous' || name === 'next';
+  return (
+    <svg
+      className={isDirectional ? 'glyph glyph-directional' : 'glyph'}
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={GLYPH_PATHS[name]} />
+    </svg>
+  );
+}
+
 function App() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
@@ -482,13 +506,15 @@ function App() {
         <section className="pdf-pane" aria-label="PDF 원문">
           <div className="toolbar glass-toolbar">
             <button
+              className="icon-button"
               type="button"
               aria-label="이전 페이지"
+              title="이전 페이지"
               aria-keyshortcuts="ArrowLeft"
               onClick={() => movePage(-1)}
               disabled={!canNavigate || pageNumber <= 1}
             >
-              이전
+              <Glyph name="previous" />
             </button>
             <form className="page-form" onSubmit={submitPage}>
               <input
@@ -504,8 +530,16 @@ function App() {
               />
               <span>/ {totalPages || '-'}</span>
             </form>
-            <button type="button" aria-label="다음 페이지" aria-keyshortcuts="ArrowRight" onClick={() => movePage(1)} disabled={!canNavigate || pageNumber >= totalPages}>
-              다음
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="다음 페이지"
+              title="다음 페이지"
+              aria-keyshortcuts="ArrowRight"
+              onClick={() => movePage(1)}
+              disabled={!canNavigate || pageNumber >= totalPages}
+            >
+              <Glyph name="next" />
             </button>
             <div className="toolbar-spacer" />
             <select aria-label="페이지 맞춤 방식" value={fitMode} onChange={changeFitMode} disabled={!canNavigate}>
@@ -513,12 +547,26 @@ function App() {
               <option value="height">세로 맞춤</option>
               <option value="width">가로 맞춤</option>
             </select>
-            <button type="button" onClick={() => changeScale(-0.15)} disabled={!canNavigate || scale <= MIN_SCALE}>
-              축소
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="축소"
+              title="축소"
+              onClick={() => changeScale(-0.15)}
+              disabled={!canNavigate || scale <= MIN_SCALE}
+            >
+              <Glyph name="minus" />
             </button>
             <span className="scale-label">{Math.round(scale * 100)}%</span>
-            <button type="button" onClick={() => changeScale(0.15)} disabled={!canNavigate || scale >= MAX_SCALE}>
-              확대
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="확대"
+              title="확대"
+              onClick={() => changeScale(0.15)}
+              disabled={!canNavigate || scale >= MAX_SCALE}
+            >
+              <Glyph name="plus" />
             </button>
           </div>
 
@@ -571,20 +619,24 @@ function App() {
                   <button
                     className="stage-nav-button"
                     type="button"
+                    aria-label="이전 페이지"
+                    title="이전 페이지"
                     aria-keyshortcuts="ArrowLeft"
                     onClick={() => movePage(-1)}
                     disabled={pageNumber <= 1}
                   >
-                    이전 페이지
+                    <Glyph name="previous" />
                   </button>
                   <button
                     className="stage-nav-button"
                     type="button"
+                    aria-label="다음 페이지"
+                    title="다음 페이지"
                     aria-keyshortcuts="ArrowRight"
                     onClick={() => movePage(1)}
                     disabled={pageNumber >= totalPages}
                   >
-                    다음 페이지
+                    <Glyph name="next" />
                   </button>
                 </div>
               </>
