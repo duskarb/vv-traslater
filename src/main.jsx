@@ -67,6 +67,7 @@ function buildTranslationImageDataUrl(sourceCanvas) {
 function App() {
   const canvasRef = useRef(null);
   const stageRef = useRef(null);
+  const translationScrollRef = useRef(null);
   const fileInputRef = useRef(null);
   const renderTaskRef = useRef(null);
   const latestRequestRef = useRef(0);
@@ -147,7 +148,7 @@ function App() {
 
     function handleKeyDown(event) {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName)) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
 
       const isRightToLeft = document.documentElement.dir === 'rtl';
       const previousKey = isRightToLeft ? 'ArrowRight' : 'ArrowLeft';
@@ -238,6 +239,9 @@ function App() {
   useEffect(() => {
     if (!documentId || !pageNumber) return;
 
+    // New page, new text: start the reader at the top instead of wherever the
+    // previous page was left scrolled to.
+    translationScrollRef.current?.scrollTo({ top: 0 });
     latestRequestRef.current += 1;
     translationRequestRef.current = null;
     setTranslationStatus('idle');
@@ -256,7 +260,11 @@ function App() {
         renderTaskRef.current.cancel();
       }
 
-      setViewerStatus('페이지를 그리는 중입니다.');
+      // Most pages paint in a few frames. Showing the status immediately makes
+      // it strobe on every arrow press, so only surface it if the render waits.
+      const statusTimer = setTimeout(() => {
+        if (!cancelled) setViewerStatus('페이지를 그리는 중입니다.');
+      }, 220);
 
       try {
         const page = await pdf.getPage(pageNumber);
@@ -293,6 +301,7 @@ function App() {
         const task = page.render({ canvasContext: context, viewport });
         renderTaskRef.current = task;
         await task.promise;
+        clearTimeout(statusTimer);
         if (cancelled) return;
         renderTaskRef.current = null;
         setViewerStatus('');
@@ -300,6 +309,8 @@ function App() {
       } catch (error) {
         if (cancelled || error?.name === 'RenderingCancelledException') return;
         setViewerStatus(error?.message || '페이지를 그릴 수 없습니다.');
+      } finally {
+        clearTimeout(statusTimer);
       }
     }
 
@@ -618,7 +629,7 @@ function App() {
             </div>
           ) : null}
 
-          <div className="translation-card" dir="auto">{renderTranslationBody()}</div>
+          <div className="translation-card" dir="auto" ref={translationScrollRef}>{renderTranslationBody()}</div>
           {canNavigate ? <p className="ai-note">AI 번역은 초안일 수 있습니다. 중요한 내용은 원문과 함께 확인하세요.</p> : null}
         </aside>
       </section>
