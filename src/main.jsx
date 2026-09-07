@@ -119,7 +119,7 @@ function App() {
   const hasDocument = Boolean(pdf);
   const currentMeta = useMemo(() => {
     if (!fileName) return '';
-    return `${fileName} · ${totalPages || '-'} pages`;
+    return `${fileName} · 총 ${totalPages || '-'}페이지`;
   }, [fileName, totalPages]);
   const scale = useMemo(() => clamp(fitScale + zoomOffset, MIN_SCALE, MAX_SCALE), [fitScale, zoomOffset]);
 
@@ -315,8 +315,12 @@ function App() {
 
         canvas.width = Math.floor(viewport.width * pixelRatio);
         canvas.height = Math.floor(viewport.height * pixelRatio);
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        // Keep the CSS box on the exact same aspect ratio as the PDF viewport.
+        // The backing store can use a different pixel ratio without changing the
+        // visible page proportions.
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
 
         context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         context.fillStyle = '#ffffff';
@@ -570,7 +574,6 @@ function App() {
             </button>
           </div>
 
-          {hasDocument ? <div className="pdf-meta" aria-live="polite">{currentMeta}</div> : null}
           <div
             ref={stageRef}
             className={[
@@ -614,7 +617,12 @@ function App() {
             ) : null}
             {hasDocument ? (
               <>
-                <canvas ref={canvasRef} role="img" aria-label={`${fileName} ${pageNumber}페이지 원문`} />
+                <div className="pdf-meta" aria-live="polite">{currentMeta}</div>
+                <div className="canvas-scroll">
+                  <div className="canvas-surface">
+                    <canvas ref={canvasRef} role="img" aria-label={`${fileName} ${pageNumber}페이지 원문`} />
+                  </div>
+                </div>
                 <div className="stage-navigation" aria-label="페이지 이동">
                   <button
                     className="stage-nav-button"
