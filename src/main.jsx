@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as pdfjsLib from 'pdfjs-dist';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Toaster, toast } from 'sonner';
 import './styles.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -69,6 +70,7 @@ function App() {
   const fileInputRef = useRef(null);
   const renderTaskRef = useRef(null);
   const latestRequestRef = useRef(0);
+  const translationRequestRef = useRef(null);
   const [fileName, setFileName] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [pdf, setPdf] = useState(null);
@@ -127,7 +129,12 @@ function App() {
 
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      setStageSize({ width, height });
+      const nextSize = { width: Math.round(width), height: Math.round(height) };
+      setStageSize((currentSize) => (
+        currentSize.width === nextSize.width && currentSize.height === nextSize.height
+          ? currentSize
+          : nextSize
+      ));
     });
 
     observer.observe(stageRef.current);
@@ -173,6 +180,7 @@ function App() {
     async ({ force = false } = {}) => {
       if (!canvasRef.current || !documentId || !pageNumber) return;
 
+      const requestKey = cacheKey(documentId, pageNumber);
       const cached = !force ? readCachedTranslation(documentId, pageNumber) : null;
       if (cached) {
         setTranslation(cached);
@@ -182,8 +190,12 @@ function App() {
         return;
       }
 
+      if (!force && translationRequestRef.current?.key === requestKey) return;
+
       const requestId = latestRequestRef.current + 1;
+      const requestToken = Symbol(requestKey);
       latestRequestRef.current = requestId;
+      translationRequestRef.current = { key: requestKey, token: requestToken };
       setTranslationStatus('loading');
       setTranslationError('');
       setIsCached(false);
@@ -207,12 +219,32 @@ function App() {
         setTranslationStatus('done');
       } catch (error) {
         if (latestRequestRef.current !== requestId) return;
-        setTranslationError(error?.message || '번역 중 문제가 생겼습니다.');
+        const message = error?.message || '번역 중 문제가 생겼습니다.';
+        setTranslationError(message);
         setTranslationStatus('error');
+        toast.error('번역을 완료하지 못했습니다.', {
+          id: `translation-error:${requestKey}`,
+          description: message,
+        });
+      } finally {
+        if (translationRequestRef.current?.token === requestToken) {
+          translationRequestRef.current = null;
+        }
       }
     },
     [documentId, pageNumber],
   );
+
+  useEffect(() => {
+    if (!documentId || !pageNumber) return;
+
+    latestRequestRef.current += 1;
+    translationRequestRef.current = null;
+    setTranslationStatus('idle');
+    setTranslationError('');
+    setTranslation('');
+    setIsCached(false);
+  }, [documentId, pageNumber]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,10 +257,6 @@ function App() {
       }
 
       setViewerStatus('페이지를 그리는 중입니다.');
-      setTranslationStatus('idle');
-      setTranslationError('');
-      setTranslation('');
-      setIsCached(false);
 
       try {
         const page = await pdf.getPage(pageNumber);
@@ -351,6 +379,20 @@ function App() {
     setZoomOffset(0);
   }
 
+  async function copyTranslation() {
+    if (!translation) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('이 브라우저에서는 클립보드를 사용할 수 없습니다.');
+      }
+      await navigator.clipboard.writeText(translation);
+      toast.success('번역문을 복사했습니다.');
+    } catch {
+      toast.error('번역문을 복사하지 못했습니다.');
+    }
+  }
+
   function handleStageDragOver(event) {
     event.preventDefault();
     setIsDraggingFile(true);
@@ -393,7 +435,7 @@ function App() {
 
     if (translation) {
       return (
-        <div className="translation-text">
+        <div className="translation-text translation-reveal">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{translation}</ReactMarkdown>
         </div>
       );
@@ -403,7 +445,8 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <>
+      <main className="app-shell">
       <header className="topbar">
         <div>
           <p className="eyebrow">VV PDF Translator</p>
@@ -544,13 +587,18 @@ function App() {
               <p className="eyebrow">AI Korean Translation</p>
               <h2>{canNavigate ? `${pageNumber}페이지` : '대기 중'}</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => translateCurrentCanvas({ force: true })}
-              disabled={!canNavigate || translationStatus === 'loading'}
-            >
-              재번역
-            </button>
+            <div className="translation-actions">
+              <button type="button" onClick={copyTranslation} disabled={!translation}>
+                복사
+              </button>
+              <button
+                type="button"
+                onClick={() => translateCurrentCanvas({ force: true })}
+                disabled={!canNavigate || translationStatus === 'loading'}
+              >
+                재번역
+              </button>
+            </div>
           </div>
 
           {canNavigate ? (
@@ -574,7 +622,9 @@ function App() {
           {canNavigate ? <p className="ai-note">AI 번역은 초안일 수 있습니다. 중요한 내용은 원문과 함께 확인하세요.</p> : null}
         </aside>
       </section>
-    </main>
+      </main>
+      <Toaster position="bottom-center" theme="system" richColors />
+    </>
   );
 }
 
